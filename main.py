@@ -1,6 +1,7 @@
 import asyncio
 import uvicorn
 
+from config import WEBHOOK_URL, WEBHOOK_SECRET  # ✅ korrekt importieren
 from web import fastapi_app, telegram_app
 
 
