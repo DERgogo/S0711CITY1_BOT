@@ -5,8 +5,12 @@ from telegram.ext import Application
 from config import BOT_TOKEN, WEBHOOK_PATH, WEBHOOK_SECRET
 from bot import build_application
 
+# Telegram-Bot-Instanz mit Handlers
 telegram_app: Application = build_application(BOT_TOKEN)
+
+# FastAPI-Anwendung
 fastapi_app = FastAPI()
+
 
 @fastapi_app.get("/")
 async def root():
@@ -16,18 +20,22 @@ async def root():
         "webhook": WEBHOOK_PATH
     }
 
+
 @fastapi_app.get("/ping")
 async def ping():
     return {"status": "running", "token_suffix": BOT_TOKEN[-5:]}
 
+
 @fastapi_app.post(WEBHOOK_PATH)
 async def telegram_webhook(request: Request):
-    # Secret prüfen
+    """Verarbeitet eingehende Telegram Webhook-POSTs."""
+    # Sicherheit: Secret-Header prüfen
     secret = request.headers.get("X-Telegram-Secret")
     if secret != WEBHOOK_SECRET:
         print("⛔ Ungültiger Zugriff – Secret fehlt oder falsch!")
         raise HTTPException(status_code=403, detail="Forbidden")
 
+    # Telegram-Update verarbeiten
     data = await request.json()
     print("📩 Telegram-Update:", data)
 
