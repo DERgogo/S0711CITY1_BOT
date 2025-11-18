@@ -1,7 +1,7 @@
 import asyncio
 import uvicorn
 
-from config import WEBHOOK_URL, WEBHOOK_SECRET  # ✅ korrekt importieren
+from config import WEBHOOK_URL, WEBHOOK_SECRET
 from web import fastapi_app, telegram_app
 
 
@@ -16,10 +16,8 @@ async def set_webhook() -> None:
 
 
 def main() -> None:
-    # Webhook einmalig setzen
     asyncio.run(set_webhook())
 
-    # FastAPI + Uvicorn starten
     uvicorn.run(
         "web:fastapi_app",
         host="0.0.0.0",
