@@ -2,7 +2,6 @@ import asyncio
 import uvicorn
 
 from web import fastapi_app, telegram_app
-from web import fastapi_app, telegram_app
 
 
 async def set_webhook() -> None:
