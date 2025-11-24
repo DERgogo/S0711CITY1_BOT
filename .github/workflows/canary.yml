@@ -31,4 +31,5 @@ jobs:
         if: ${{ success() }}
         run: |
           echo "Promoting canary to full rollout..."
-          # Implement promotion logic for your platform
+          chmod +x ./.github/scripts/promote_canary.sh || true
+          ./.github/scripts/promote_canary.sh

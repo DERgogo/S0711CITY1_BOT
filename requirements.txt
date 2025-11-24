@@ -1,3 +1,6 @@
 fastapi
 uvicorn
 python-telegram-bot[fastapi]>=20.0
+
+# Icon generator
+Pillow>=9.0.0

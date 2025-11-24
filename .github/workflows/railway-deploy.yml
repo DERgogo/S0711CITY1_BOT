@@ -1,0 +1,119 @@
+name: 0711-Railway-Deploy
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      strategy:
+        description: 'Promotion strategy: A=promote commit, B=copy envs, C=canary'
+        required: false
+        default: 'A'
+
+jobs:
+  deploy-and-promote:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
+      ENVIRONMENT_STAGING: ${{ secrets.ENVIRONMENT_STAGING }}
+      ENVIRONMENT_PROD: ${{ secrets.ENVIRONMENT_PROD }}
+      DEPLOY_HEALTHCHECK_URL: ${{ secrets.DEPLOY_HEALTHCHECK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: |
+          chmod +x .github/scripts/railway_deploy.sh
+          chmod +x .github/scripts/smoke_test.sh
+          chmod +x .github/scripts/railway_rollback.sh
+
+      - name: Deploy to staging
+        id: deploy_staging
+        run: |
+          echo "Deploying to staging environment ($ENVIRONMENT_STAGING)"
+          .github/scripts/railway_deploy.sh "$ENVIRONMENT_STAGING"
+
+      - name: Capture staging release id
+        id: capture_staging_release
+        run: |
+          # Attempt to read release ID from Railway CLI (JSON output)
+          if command -v railway >/dev/null 2>&1; then
+            r=$(railway releases --environment "$ENVIRONMENT_STAGING" --json 2>/dev/null | jq -r '.[0].id' || true)
+            echo "staging_release_id=$r" >> $GITHUB_OUTPUT
+            mkdir -p release-artifacts
+            echo "$r" > release-artifacts/staging_release_id.txt
+            ls -la release-artifacts || true
+          else
+            echo "staging_release_id=" >> $GITHUB_OUTPUT
+          fi
+
+
+      - name: Wait for staging to settle
+        run: sleep 8
+
+      - name: Run smoke test against staging
+        id: smoke_staging
+        run: |
+          if [ -n "${DEPLOY_HEALTHCHECK_URL:-}" ]; then
+            .github/scripts/smoke_test.sh "$DEPLOY_HEALTHCHECK_URL"
+          else
+            echo "No DEPLOY_HEALTHCHECK_URL set; marking smoke test skipped"
+            exit 78
+          fi
+        continue-on-error: true
+
+      - name: Decide promotion
+        id: decide
+        run: |
+          STRAT=${{ github.event.inputs.strategy || github.event.strategy || 'A' }}
+          echo "strategy=$STRAT" >> $GITHUB_OUTPUT
+
+      - name: Promote to production (strategy A)
+        if: ${{ steps.decide.outputs.strategy == 'A' && (steps.smoke_staging.outcome == 'success' || steps.smoke_staging.conclusion == 'success') }}
+        run: |
+          echo "Promoting same commit to production ($ENVIRONMENT_PROD)"
+          .github/scripts/railway_deploy.sh "$ENVIRONMENT_PROD"
+
+      - name: Capture production release id
+        id: capture_prod_release
+        run: |
+          if command -v railway >/dev/null 2>&1; then
+            r=$(railway releases --environment "$ENVIRONMENT_PROD" --json 2>/dev/null | jq -r '.[0].id' || true)
+            echo "prod_release_id=$r" >> $GITHUB_OUTPUT
+            mkdir -p release-artifacts
+            echo "$r" > release-artifacts/prod_release_id.txt
+          else
+            echo "prod_release_id=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts-${{ github.run_id }}
+          path: release-artifacts || |
+            echo "no artifacts"
+
+      - name: Post-promotion smoke test (production)
+        if: ${{ steps.decide.outputs.strategy == 'A' && (steps.smoke_staging.outcome == 'success' || steps.smoke_staging.conclusion == 'success') }}
+        run: |
+          if [ -n "${DEPLOY_HEALTHCHECK_URL:-}" ]; then
+            .github/scripts/smoke_test.sh "$DEPLOY_HEALTHCHECK_URL"
+          else
+            echo "No DEPLOY_HEALTHCHECK_URL set; skipping production smoke test"
+            exit 78
+          fi
+        continue-on-error: true
+
+      - name: Rollback if production smoke failed
+        if: ${{ steps.decide.outputs.strategy == 'A' && (steps.smoke_staging.outcome == 'success' || steps.smoke_staging.conclusion == 'success') && (steps.post-promotion-smoke-test.outcome == 'failure' || steps.post-promotion-smoke-test.conclusion == 'failure') }}
+        run: |
+          echo "Production smoke failed — attempting rollback. Provide a RELEASE_ID if available as input.RELEASE_ID"
+          .github/scripts/railway_rollback.sh "${{ github.event.inputs.release_id || '' }}" || true
+
+      - name: Notify
+        run: |
+          echo "Deployment workflow completed. Check logs for details."

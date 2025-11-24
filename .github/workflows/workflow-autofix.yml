@@ -1,0 +1,57 @@
+name: 0711-Workflow-AutoFix
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run YAML lint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .github/yamllint.yml
+
+      - name: Attempt auto-fixes
+        id: fixes
+        run: |
+          set -e
+          FIXED=0
+          # Fix setup-python@v4 -> @v5
+          if grep -R "setup-python@v4" .github/workflows || true; then
+            git config user.name "0711-AutoFix"
+            git config user.email "autofix@0711.local"
+            for f in $(grep -RIl "setup-python@v4" .github/workflows || true); do
+              sed -E -i "s/actions\/setup-python@v4/actions\/setup-python@v5/g" "$f"
+              git add "$f"
+              FIXED=1
+            done
+          fi
+
+          # Remove accidental use of pull_request_target
+          if grep -R "pull_request_target" .github/workflows || true; then
+            for f in $(grep -RIl "pull_request_target" .github/workflows || true); do
+              sed -E -i "/pull_request_target/d" "$f" || true
+              git add "$f"
+              FIXED=1
+            done
+          fi
+
+          echo "fixed=${FIXED}" >> $GITHUB_OUTPUT
+
+      - name: Create fix PR
+        if: steps.fixes.outputs.fixed == '1'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          commit-message: "chore(autofix): workflow lint fixes"
+          branch: autofix/workflow-fixes-${{ github.sha }}
+          title: "AutoFix: workflow lint fixes"
+          body: |
+            This PR was created automatically by 0711-Workflow-AutoFix to apply simple fixes:
+            - upgrade `actions/setup-python@v4` -> `@v5`
+            - remove `pull_request_target` usage
