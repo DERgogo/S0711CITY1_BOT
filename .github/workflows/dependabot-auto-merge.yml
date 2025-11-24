@@ -1,0 +1,42 @@
+name: Dependabot auto-merge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  dependabot:
+    # nur Dependabot-PRs bearbeiten
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for Dependabot semver-patch updates
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' && github.event.pull_request.draft == false
+        # Verwende ein Action, um Auto-Merge sauber zu aktivieren (kein GH CLI nötig)
+        uses: peter-evans/enable-pull-request-automerge@v2
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: merge
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Fallback: merge immediately (optional)
+        if: steps.metadata.outputs.update-type == 'version-update:semver-patch' && github.event.pull_request.draft == false
+        uses: peter-evans/merge-pull-request@v3
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: merge
+          commit-title: "chore(deps): merge dependabot update"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

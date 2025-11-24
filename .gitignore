@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+.env.local
+*.secret
+
+# Editor
+.vscode/
+.idea/
