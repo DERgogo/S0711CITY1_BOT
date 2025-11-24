@@ -21,3 +21,36 @@ jobs:
     - name: Analysing the code with pylint
       run: |
         pylint $(git ls-files '*.py')
+# ensure up-to-date and switch to the branch I created remotely
+git fetch origin
+git checkout feature/add-service-worker
+
+# create public/ and write the file (heredoc will write the exact content above)
+mkdir -p public
+cat > public/service-worker.js <<'EOF'
+// Minimaler Service‑Worker: cache für index.html + Offline‑Fallback
+const CACHE = 's0711-v1';
+self.addEventListener('install', e =>
+  e.waitUntil(
+    caches.open(CACHE).then(cache => cache.addAll(['/','/index.html']))
+  )
+);
+self.addEventListener('fetch', e =>
+  e.respondWith(
+    caches.match(e.request).then(r => r || fetch(e.request)).catch(() => caches.match('/index.html'))
+  )
+);
+EOF
+
+# stage, commit, push to the existing remote branch
+git add public/service-worker.js
+git commit -m "chore(pwa): add minimal service-worker for offline fallback"
+git push -u origin feature/add-service-worker
+
+# create PR via gh (optional — requires gh logged in), otherwise use Web UI
+gh pr create \
+  --base main \
+  --head feature/add-service-worker \
+  --title "chore(pwa): add service worker" \
+  --body-file PR_BODY.txt \
+  --reviewer DERgogo
