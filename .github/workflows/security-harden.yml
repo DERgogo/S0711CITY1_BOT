@@ -1,0 +1,23 @@
+name: Security Hardening
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Scan for Secrets
+        uses: trufflesecurity/trufflehog@v3
+
+      - name: Dependency Check
+        uses: actions/dependency-review-action@v3
+
+      - name: Static Security Audit
+        uses: snyk/actions/python@v1
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}

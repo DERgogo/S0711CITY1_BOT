@@ -1,0 +1,27 @@
+name: Auto-Docs
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-Generate Markdown Docs
+        uses: github/copilot-actions/pull-request-docs@v1
+        with:
+          target: docs/
+
+      - name: Commit Docs
+        run: |
+          if [ -n "$(git status --porcelain docs/)" ]; then
+            git config user.name "0711-AutoDocs"
+            git config user.email "noreply@0711.local"
+            git add docs/
+            git commit -m "auto-docs: update"
+            git push
+          fi

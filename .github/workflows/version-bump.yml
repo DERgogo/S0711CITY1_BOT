@@ -1,0 +1,23 @@
+name: Version Bump
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Semantic Version Bump
+        uses: paulhatch/semantic-version@v5
+        id: version
+        with:
+          branch: main
+
+      - name: Create Tag
+        run: |
+          git tag -a ${{ steps.version.outputs.version }} -m "AutoVersion"
+          git push origin ${{ steps.version.outputs.version }}
