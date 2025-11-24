@@ -1,0 +1,61 @@
+name: 0711-Icon-Generator
+
+on:
+  workflow_dispatch:
+    inputs:
+      project_name:
+        description: 'Optional single project name to generate icons for'
+        required: false
+  push:
+    # Run when new project folders are added/changed under `projects/`
+    paths:
+      - 'projects/**'
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate icons
+        id: gen
+        run: |
+          set -euo pipefail
+          # If workflow_dispatch input provided, target only that project
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.project_name }}" ]; then
+            projects="${{ github.event.inputs.project_name }}"
+            echo "Generating icons for specified project: $projects"
+            for p in $projects; do
+              mkdir -p "projects/$p"
+              python3 scripts/generate_icon.py "$p" --out "projects/$p/icons"
+            done
+          else
+            # Generate for all directories under projects/
+            for d in projects/*/; do
+              [ -d "$d" ] || continue
+              name=$(basename "$d")
+              echo "Generating icons for $name"
+              python3 scripts/generate_icon.py "$name" --out "$d/icons"
+            done
+          fi
+
+      - name: Commit & open PR
+        uses: peter-evans/create-pull-request@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: chore(icons): generate icons for projects
+          branch: ghci/icon-generator-${{ github.run_id }}
+          title: chore(icons): generated icons
+          body: Auto-generated icons by 0711-Icon-Generator workflow

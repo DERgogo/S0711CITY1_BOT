@@ -1,0 +1,60 @@
+name: 0711-Railway-Canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      canary_env:
+        description: 'Canary environment id'
+        required: true
+      prod_env:
+        description: 'Production environment id'
+        required: true
+      promote:
+        description: 'Promote on success (yes/no)'
+        required: false
+        default: 'yes'
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    env:
+      RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+      PROJECT_ID: ${{ secrets.PROJECT_ID }}
+      DEPLOY_HEALTHCHECK_URL: ${{ secrets.DEPLOY_HEALTHCHECK_URL }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Make scripts executable
+        run: |
+          chmod +x .github/scripts/railway_canary.sh
+          chmod +x .github/scripts/smoke_test.sh
+
+      - name: Run canary deploy
+        id: canary_run
+        run: |
+          .github/scripts/railway_canary.sh "${{ github.event.inputs.canary_env }}" "${{ github.event.inputs.prod_env }}" "${{ github.event.inputs.promote }}"
+
+      - name: Capture canary release id
+        id: capture_canary_release
+        run: |
+          if command -v railway >/dev/null 2>&1; then
+            r=$(railway releases --environment "${{ github.event.inputs.canary_env }}" --json 2>/dev/null | jq -r '.[0].id' || true)
+            echo "canary_release_id=$r" >> $GITHUB_OUTPUT
+            mkdir -p release-artifacts
+            echo "$r" > release-artifacts/canary_release_id.txt
+          else
+            echo "canary_release_id=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload release artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canary-release-artifacts-${{ github.run_id }}
+          path: release-artifacts || |
+            echo "no artifacts"
+
+      - name: Notify
+        run: echo "Canary workflow finished"
