@@ -1,0 +1,28 @@
+name: 0711-AI-Log-Analyser
+
+on:
+  workflow_run:
+    workflows: ["0711-Auto-Deploy"]
+    types: [completed]
+
+jobs:
+  analyse:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch Logs
+        run: |
+          # Placeholder: fetch logs from your platform or use workflow artifacts
+          echo "Collecting logs..." > logs.txt
+          echo "(no real logs available in demo)" >> logs.txt
+
+      - name: AI Analyse
+        # This action is illustrative — ensure the action exists or replace with your AI tool
+        uses: github/copilot-actions/review@v1
+        with:
+          filepaths: "logs.txt"
+          enable_suggestions: true
+          enable_security: true

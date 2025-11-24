@@ -1,0 +1,74 @@
+name: 0711-Auto-Deploy
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: |
+          curl -fsSL https://railway.app/cli | bash
+
+      - name: Deploy to Railway (detached)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          # deploy the current tag/commit
+          railway up --detach || (echo "Deploy command failed" && exit 1)
+
+      - name: Wait for service to become healthy
+        run: |
+          # simple healthcheck loop against WEBHOOK_URL or APP_URL env
+          TARGET=${{ secrets.DEPLOY_HEALTHCHECK_URL }}
+          if [ -z "$TARGET" ]; then
+            echo "No DEPLOY_HEALTHCHECK_URL set; skipping healthcheck"
+            exit 0
+          fi
+          for i in 1 2 3 4 5; do
+            echo "Checking $TARGET (attempt $i)..."
+            if curl -fsS "$TARGET" >/dev/null; then
+              echo "Service healthy"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Healthcheck failed"
+          exit 1
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: ${{ needs.deploy.result == 'failure' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Determine last good tag
+        id: find_tag
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ || true)
+          echo "prev_tag=${PREV_TAG}" >> $GITHUB_OUTPUT
+
+      - name: Rollback to previous tag (if found)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          if [ -z "${{ steps.find_tag.outputs.prev_tag }}" ]; then
+            echo "No previous tag found; manual intervention required"
+            exit 1
+          fi
+          git checkout ${{ steps.find_tag.outputs.prev_tag }}
+          curl -fsSL https://railway.app/cli | bash
+          railway up --detach || (echo "Rollback deploy failed" && exit 1)

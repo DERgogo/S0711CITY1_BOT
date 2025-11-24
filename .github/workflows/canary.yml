@@ -1,0 +1,34 @@
+name: 0711-Canary-Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Canary Deploy (10%)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+        run: |
+          echo "Starting canary deploy (10%)..."
+          # Placeholder: implement canary targeting with your platform's routing/traffic-shaping
+          # Example with Railway: deploy to an environment named 'canary'
+          curl -fsSL https://railway.app/cli | bash
+          railway up --environment canary --detach || (echo "Canary deploy failed" && exit 1)
+
+      - name: Monitor canary
+        run: |
+          echo "Monitor canary for a period or execute smoke tests here"
+          # For demo purposes we wait briefly
+          sleep 10
+
+      - name: Promote canary
+        if: ${{ success() }}
+        run: |
+          echo "Promoting canary to full rollout..."
+          # Implement promotion logic for your platform
