@@ -1,0 +1,49 @@
+name: 0711-ULTRA-WORKFLOW-GUARD
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  push:
+    paths:
+      - ".github/workflows/**"
+
+jobs:
+  lint:
+    name: Workflow Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Validate YAML
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_file: .github/yamllint.yml
+
+      - name: Enforce setup-python v5
+        run: |
+          if grep -R "setup-python@v4" .github/workflows; then
+            echo "❌ ERROR: setup-python@v4 gefunden – Upgrade auf @v5 erforderlich."
+            exit 1
+          fi
+
+      - name: Enforce pinned action versions
+        run: |
+          if grep -R "@v0" .github/workflows; then
+            echo "❌ ERROR: Ungepinnt oder alte Major-Version gefunden."
+            exit 1
+          fi
+
+      - name: Check forbidden patterns
+        run: |
+          if grep -R "pull_request_target" .github/workflows; then
+            echo "❌ Sicherheitsrisiko: pull_request_target gefunden."
+            exit 1
+          fi
+
+      - name: Security Scan for known dangerous actions
+        uses: step-security/secure-workflows@v1
+        with:
+          config: strict
