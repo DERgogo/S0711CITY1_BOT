@@ -23,4 +23,8 @@ WEBHOOK_URL = os.getenv("WEBHOOK_URL") or f"https://s0711citybot.up.railway.app{
 
 if not BOT_TOKEN:
 	# Warnung ausgeben — in CI/Prod empfiehlt sich ein Fail-fast Verhalten
-	print("⚠️ WARNING: BOT_TOKEN is not set. Set the BOT_TOKEN env var before running the bot (main.py).")
+	pass
+
+if __name__ == "__main__":
+    if not BOT_TOKEN:
+        print("⚠️ WARNING: BOT_TOKEN is not set. Set the BOT_TOKEN env var before running the bot (main.py).")
