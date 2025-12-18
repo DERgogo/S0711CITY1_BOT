@@ -16,10 +16,7 @@ if not WEBHOOK_SECRET:
 	raise RuntimeError("WEBHOOK_SECRET is required. Set the WEBHOOK_SECRET env var before running the application.")
 
 # Webhook-Endpunkt: 1) nutze `WEBHOOK_PATH` Env-Var falls vorhanden, sonst aus BOT_TOKEN ableiten
-if os.getenv("WEBHOOK_PATH"):
-	WEBHOOK_PATH = os.getenv("WEBHOOK_PATH")
-else:
-	WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}" if BOT_TOKEN else "/webhook/undefined"
+WEBHOOK_PATH = os.getenv("WEBHOOK_PATH") or (f"/webhook/{BOT_TOKEN}" if BOT_TOKEN else "/webhook/undefined")
 
 # Webhook-URL: erlaubt Override per Env-Var, sonst Fallback auf die (Railway-)Hostname + PATH
 WEBHOOK_URL = os.getenv("WEBHOOK_URL") or f"https://s0711citybot.up.railway.app{WEBHOOK_PATH}"
